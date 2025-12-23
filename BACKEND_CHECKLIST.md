@@ -27,9 +27,9 @@
 ## Phase 2: Additional Primitive Types
 
 ### 2.1 Add long support (8 bytes)
-- [ ] Implement putLong(int addr, long x)
-- [ ] Implement getLong(int addr)
-- [ ] Test big-endian encoding/decoding
+- [x] Implement putLong(int addr, long x)
+- [x] Implement getLong(int addr)
+- [x] Test big-endian encoding/decoding
 
 ### 2.2 Add short support (2 bytes)
 - [ ] Implement putShort(int addr, short x)

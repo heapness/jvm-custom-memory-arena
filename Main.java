@@ -6,6 +6,7 @@ public class Main {
         testNodeStore();
         testErrorMessages();
         testBigEndianEncoding();
+        testLongSupport();
     }
 
     static void testBasicAllocation() {
@@ -174,7 +175,42 @@ public class Main {
         System.out.println("Reconstructed value: 0x" + Integer.toHexString(reconstructed));
         System.out.println("Match: " + (testValue == reconstructed));
         System.out.println();
+    
+    }
+
+    static void testLongSupport() {
+        System.out.println("Test 6: Long Support (8 bytes)");
+        MemoryArena arena = new MemoryArena(128);
         
-        System.out.println("=== ALL TESTS COMPLETE ===");
+        int addr = arena.alloc(8);
+        long testValue = 0x0123456789ABCDEFL;
+        arena.putLong(addr, testValue);
+        
+        System.out.println("Storing long value: 0x" + Long.toHexString(testValue) + " at address " + addr);
+        System.out.println("Byte representation (big-endian, 8 bytes):");
+        for (int i = 0; i < 8; i++) {
+            System.out.println("  memory[" + (addr + i) + "] = 0x" + Integer.toHexString(arena.memory[addr + i] & 0xFF));
+        }
+        
+        long reconstructed = arena.getLong(addr);
+        System.out.println("Reconstructed value: 0x" + Long.toHexString(reconstructed));
+        System.out.println("Match: " + (testValue == reconstructed));
+        
+        System.out.println("\nTesting edge cases:");
+        long maxLong = Long.MAX_VALUE;
+        int addr2 = arena.alloc(8);
+        arena.putLong(addr2, maxLong);
+        System.out.println("  Max long (" + maxLong + ") stored and retrieved: " + (maxLong == arena.getLong(addr2)));
+        
+        long minLong = Long.MIN_VALUE;
+        int addr3 = arena.alloc(8);
+        arena.putLong(addr3, minLong);
+        System.out.println("  Min long (" + minLong + ") stored and retrieved: " + (minLong == arena.getLong(addr3)));
+        
+        long zero = 0L;
+        int addr4 = arena.alloc(8);
+        arena.putLong(addr4, zero);
+        System.out.println("  Zero stored and retrieved: " + (zero == arena.getLong(addr4)));
+        System.out.println();
     }
 }

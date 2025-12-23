@@ -81,6 +81,31 @@ public class MemoryArena {
         return reconstruct;
     }
 
+    public void putLong(int addr, long x) {
+        long[] bytes = {
+            (x >>> 56) & 0xFF, (x >>> 48) & 0xFF, (x >>> 40) & 0xFF, (x >>> 32) & 0xFF,
+            (x >>> 24) & 0xFF, (x >>> 16) & 0xFF, (x >>> 8) & 0xFF, (x >>> 0) & 0xFF
+        };
+        checkAddr(addr, 8);
+        for (int i = 0; i < 8; i++) {
+            memory[addr + i] = (byte) bytes[i];
+        }
+    }
+
+    public long getLong(int addr) {
+        checkAddr(addr, 8);
+        long reconstruct = 
+            ((long)(memory[addr] & 0xFF) << 56) |
+            ((long)(memory[addr + 1] & 0xFF) << 48) |
+            ((long)(memory[addr + 2] & 0xFF) << 40) |
+            ((long)(memory[addr + 3] & 0xFF) << 32) |
+            ((long)(memory[addr + 4] & 0xFF) << 24) |
+            ((long)(memory[addr + 5] & 0xFF) << 16) |
+            ((long)(memory[addr + 6] & 0xFF) << 8) |
+            ((long)(memory[addr + 7] & 0xFF));
+        return reconstruct;
+    }
+
     public boolean checkAddr(int addr, int bytesNeeded) {
         if (addr >= 0 && addr + bytesNeeded <= offset) {
             return true;
