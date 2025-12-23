@@ -134,6 +134,17 @@ public class MemoryArena {
         return reconstruct;
     }
 
+    public void putBoolean(int addr, boolean x) {
+        checkAddr(addr, 1);
+        memory[addr] = (byte) (x ? 1 : 0);
+    }
+
+    public boolean getBoolean(int addr) {
+        checkAddr(addr, 1);
+        boolean reconstruct = (memory[addr] & 0xFF) == 1;
+        return reconstruct;
+    }
+
     public boolean checkAddr(int addr, int bytesNeeded) {
         if (addr >= 0 && addr + bytesNeeded <= offset) {
             return true;

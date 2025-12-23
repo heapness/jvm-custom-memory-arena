@@ -37,14 +37,14 @@
 - [x] Test 2-byte big-endian encoding
 
 ### 2.3 Add char support (2 bytes, UTF-16)
-- [ ] Implement putChar(int addr, char c)
-- [ ] Implement getChar(int addr)
-- [ ] Test character encoding
+- [x] Implement putChar(int addr, char c)
+- [x] Implement getChar(int addr)
+- [x] Test character encoding
 
 ### 2.4 Add boolean support (1 byte)
-- [ ] Implement putBoolean(int addr, boolean b)
-- [ ] Implement getBoolean(int addr)
-- [ ] Test boolean representation
+- [x] Implement putBoolean(int addr, boolean b)
+- [x] Implement getBoolean(int addr)
+- [x] Test boolean representation
 
 ## Phase 3: Structured Data Types
 

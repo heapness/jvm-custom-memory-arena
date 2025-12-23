@@ -9,6 +9,7 @@ public class Main {
         testLongSupport();
         testShortSupport();
         testCharSupport();
+        testBooleanSupport();
     }
 
     static void testBasicAllocation() {
@@ -275,8 +276,42 @@ public class Main {
             arena.putChar(charAddr, c);
             char retrieved = arena.getChar(charAddr);
             boolean match = (c == retrieved);
-            System.out.println("  '" + c + "' (U+" + Integer.toHexString(c).toUpperCase() + ") - " + (match ? "OK" : "FAIL"));
+            System.out.println("  '" + c + "' (U+" + Integer.toHexString(c).toUpperCase() + ") - " + (match ? "PASS" : "FAIL"));
         }
+        System.out.println();
+    }
+
+    static void testBooleanSupport() {
+        System.out.println("Test 9: Boolean Support (1 byte)");
+        MemoryArena arena = new MemoryArena(128);
+        
+        int addr1 = arena.alloc(1);
+        boolean testValue1 = true;
+        arena.putBoolean(addr1, testValue1);
+        
+        System.out.println("Storing boolean value: " + testValue1 + " at address " + addr1);
+        System.out.println("Byte representation (1 byte):");
+        System.out.println("  memory[" + addr1 + "] = " + (arena.memory[addr1] & 0xFF));
+        
+        boolean reconstructed1 = arena.getBoolean(addr1);
+        System.out.println("Reconstructed value: " + reconstructed1);
+        System.out.println("Match: " + (testValue1 == reconstructed1));
+        
+        int addr2 = arena.alloc(1);
+        boolean testValue2 = false;
+        arena.putBoolean(addr2, testValue2);
+        
+        System.out.println("\nStoring boolean value: " + testValue2 + " at address " + addr2);
+        System.out.println("Byte representation (1 byte):");
+        System.out.println("  memory[" + addr2 + "] = " + (arena.memory[addr2] & 0xFF));
+        
+        boolean reconstructed2 = arena.getBoolean(addr2);
+        System.out.println("Reconstructed value: " + reconstructed2);
+        System.out.println("Match: " + (testValue2 == reconstructed2));
+        
+        System.out.println("\nTesting representation:");
+        System.out.println("  true stored as: " + (arena.memory[addr1] & 0xFF));
+        System.out.println("  false stored as: " + (arena.memory[addr2] & 0xFF));
         System.out.println();
     }
 }
