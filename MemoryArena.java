@@ -120,6 +120,20 @@ public class MemoryArena {
         return reconstruct;
     }
 
+    public void putChar(int addr, char x) {
+        byte[] bytes = {(byte)((x >>> 8) & 0xFF), (byte)((x >>> 0) & 0xFF)};
+        checkAddr(addr, 2);
+        for (int i = 0; i < 2; i++) {
+            memory[addr + i] = (byte) bytes[i];
+        }
+    }
+
+    public char getChar(int addr) {
+        checkAddr(addr, 2);
+        char reconstruct = (char)(((char)(memory[addr] & 0xFF) << 8) | (char)(memory[addr + 1] & 0xFF));
+        return reconstruct;
+    }
+
     public boolean checkAddr(int addr, int bytesNeeded) {
         if (addr >= 0 && addr + bytesNeeded <= offset) {
             return true;

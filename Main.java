@@ -8,6 +8,7 @@ public class Main {
         testBigEndianEncoding();
         testLongSupport();
         testShortSupport();
+        testCharSupport();
     }
 
     static void testBasicAllocation() {
@@ -247,6 +248,35 @@ public class Main {
         int addr4 = arena.alloc(2);
         arena.putShort(addr4, zero);
         System.out.println("  Zero stored and retrieved: " + (zero == arena.getShort(addr4)));
+        System.out.println();
+    }
+
+    static void testCharSupport() {
+        System.out.println("Test 8: Char Support (2 bytes, UTF-16)");
+        MemoryArena arena = new MemoryArena(128);
+        
+        int addr = arena.alloc(2);
+        char testValue = 'A';
+        arena.putChar(addr, testValue);
+        
+        System.out.println("Storing char value: '" + testValue + "' (Unicode: U+" + Integer.toHexString(testValue).toUpperCase() + ") at address " + addr);
+        System.out.println("Byte representation (big-endian, 2 bytes):");
+        System.out.println("  memory[" + addr + "] = 0x" + Integer.toHexString(arena.memory[addr] & 0xFF));
+        System.out.println("  memory[" + (addr + 1) + "] = 0x" + Integer.toHexString(arena.memory[addr + 1] & 0xFF));
+        
+        char reconstructed = arena.getChar(addr);
+        System.out.println("Reconstructed value: '" + reconstructed + "'");
+        System.out.println("Match: " + (testValue == reconstructed));
+        
+        System.out.println("\nTesting various characters:");
+        char[] testChars = {'A', 'Z', '0', '9', ' ', '!', '中', '\u03A9'};
+        for (char c : testChars) {
+            int charAddr = arena.alloc(2);
+            arena.putChar(charAddr, c);
+            char retrieved = arena.getChar(charAddr);
+            boolean match = (c == retrieved);
+            System.out.println("  '" + c + "' (U+" + Integer.toHexString(c).toUpperCase() + ") - " + (match ? "OK" : "FAIL"));
+        }
         System.out.println();
     }
 }
