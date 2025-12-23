@@ -38,53 +38,67 @@ The project incrementally builds higher-level behavior on top of this foundation
 
 ### 1. Memory Arena
 
-The arena is a contiguous block of memory represented by a `byte[]` and a single allocation pointer (`offset`).
+A contiguous `byte[]` with a single allocation pointer (`offset`).
 
 ```
-[ allocated memory | unallocated memory ]
-                 ^
-               offset
+Memory Arena (128 bytes capacity)
+┌─────────────────────────────────────────────────────────┐
+│ 0x00 │ 0x01 │ 0x02 │ ... │ 0x0B │ 0x0C │ ... │ 0x7F     │
+├──────┴──────┴──────┴─────┴──────┴──────┴─────┴──────────┤
+│ ←─── Allocated (12 bytes) ───→ │ ←─── Free ────────────→│
+│                                ↑                        │
+│                            offset = 12                  │
+└─────────────────────────────────────────────────────────┘
+
+Rules: Allocate before use | Bounds-checked access | Reset clears all
 ```
-
-Rules:
-- Memory must be allocated before use
-- Reads and writes are only allowed inside the allocated region
-- Resetting the arena invalidates all previously allocated addresses
-
-This mirrors modern arena allocators used in professional systems programming.
 
  
 
 ### 2. Strict Allocation Model
 
-This project uses a strict safety model:
+All access validated against allocation boundary. Invalid access → immediate exception.
 
-- All memory access is validated against the current allocation boundary
-- Reading or writing outside allocated memory throws immediately
-- There is no silent memory corruption
-
-This forces correct reasoning and makes bugs obvious.
+```
+Valid Access:          Invalid Access:
+┌─────────────┐        ┌─────────────┐
+│ Allocated   │        │ Allocated   │
+│   [data]    │        │   [data]    │
+│             │        │             │
+│ ←─✓─→       │        │ ←─✓─→  ✗──→ │
+└─────────────┘        └─────────────┘
+   offset=12              offset=12
+                          (tries to read at 20)
+```
 
  
 
 ### 3. Primitive Storage (Big Endian)
 
-All primitive types are stored manually with explicit byte-level encoding.
+All primitives stored with explicit byte-level encoding.
 
-Supported types:
-- `byte` (1 byte)
-- `short` (2 bytes)
-- `int` (4 bytes)
-- `long` (8 bytes)
-- `char` (2 bytes, UTF-16)
-- `boolean` (1 byte: 0 = false, 1 = true)
+```
+Type Sizes:           Big-Endian Encoding Example (int 0x12345678):
+┌─────────┬──────┐   ┌─────────────────────────────────────────┐
+│ byte    │  1B  │   │ Value: 0x12345678                       │
+│ boolean │  1B  │   │                                         │
+│ short   │  2B  │   │ Memory Layout:                          │
+│ char    │  2B  │   │ ┌──────┬──────┬──────┬──────┐           │
+│ int     │  4B  │   │ │ 0x12 │ 0x34 │ 0x56 │ 0x78 │           │
+│ long    │  8B  │   │ └──────┴──────┴──────┴──────┘           │
+└─────────┴──────┘   │   MSB ────────────────→ LSB             │
+                     │   (Most Significant Byte First)         │
+                     └─────────────────────────────────────────┘
 
-All values are stored in **big-endian** order:
-- Most significant byte first
-- Bit shifting and masking used explicitly
-- Reconstruction performed byte-by-byte
 
-Example: storing an `int`
+Example: storing an `int`:
+
+Storage (big-endian approach):   
+(x >>> 24) & 0xFF  →  byte[0]
+(x >>> 16) & 0xFF  →  byte[1]
+(x >>>  8) & 0xFF  →  byte[2]
+(x >>>  0) & 0xFF  →  byte[3]
+
 - An `int` occupies 4 bytes
 - Values are stored in big-endian order: `[byte0][byte1][byte2][byte3]`
 - Bit shifting: `(x >>> 24) & 0xFF` for most significant byte
@@ -109,74 +123,87 @@ Node (8 bytes total):
 +------------------+
 ```
 
-Nodes are not Java objects.
-
-A node is simply:
-- an integer address
-- a fixed memory layout
-- helper methods that interpret bytes at that address
-
-The `NodeStore` class encapsulates all node operations, separating structure logic from raw memory management. This mirrors C-style structs and pointers while maintaining clean separation of concerns.
 
  
 
 ### 5. Pointers and Sentinel Values
 
-Pointers are represented as integer offsets into the arena.
+Pointers = integer offsets. `-1` = null sentinel.
 
-Rules:
-- A pointer is either:
-  - a valid address inside allocated memory
-  - `-1`, used as a null sentinel
-- All pointers are validated before use
-- Invalid pointers throw immediately
-
-This makes pointer semantics explicit and visible.
+```
+Pointer States:
+┌─────────────┬──────────────────────────────────────┐
+│ Valid       │ Points to allocated memory           │
+│   ptr = 8   │ ┌────┐                               │
+│             │ │ 8  │→ [Node at address 8]          │
+├─────────────┼──────────────────────────────────────┤
+│ Null        │ Sentinel value                       │
+│   ptr = -1  │ ┌────┐                               │
+│             │ │ -1 │→ (end of list)                │
+├─────────────┼──────────────────────────────────────┤
+│ Invalid     │ Throws InvalidPointerException       │
+│   ptr = 999 │ ┌────┐                               │
+│             │ │999 │→ ✗ Out of bounds              │
+└─────────────┴──────────────────────────────────────┘
+```
 
  
 
 ### 6. Data Structures Built from Raw Memory
 
-Using the node layout, the project implements a linked list:
+Linked list using raw memory addresses:
 
-- Nodes allocated from the arena
-- `next` pointers stored as raw addresses
-- Traversal implemented manually
-- No Java collections or object allocation involved
+```
+Linked List: [10] → [20] → [30] → null
 
-This demonstrates how high-level data structures emerge from low-level memory rules.
+Memory Layout:
+┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┐
+│ 0x00│ 0x00│ 0x00│ 0x0A│ 0x00│ 0x00│ 0x00│ 0x08│  Node 1 (addr=0)
+│ value=10  │ next=8 ────────────────┐          │
+└────────────────────────────────────┼──────────┘
+                                     │
+┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┐
+│ 0x00│ 0x00│ 0x00│ 0x14│ 0x00│ 0x00│ 0x00│ 0x10│  Node 2 (addr=8)
+│ value=20  │ next=16 ───────────────┐          │
+└────────────────────────────────────┼──────────┘
+                                     │
+┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┐
+│ 0x00│ 0x00│ 0x00│ 0x1E│ 0xFF│ 0xFF│ 0xFF│ 0xFF│  Node 3 (addr=16)
+│ value=30  │ next=-1 (null)                    │
+└───────────────────────────────────────────────┘
+```
 
  
 
 ## Safety Mechanisms
 
-Multiple layers of validation are implemented with detailed error reporting.
+### Exception Error Hierarchy 
 
-### Custom Exception Classes
+```
+MemoryException (base)
+├── OutOfMemoryException
+│   └── "Requested X bytes, only Y available (capacity: Z, used: W)"
+├── InvalidAddressException
+│   └── "Address X with Y bytes needed, boundary is Z (capacity: W)"
+└── InvalidPointerException
+    └── "Pointer X exceeds boundary Y (node size: Z, capacity: W)"
+```
 
-All memory errors throw specific exceptions with diagnostic information:
+### Validation Flow
 
-- **`OutOfMemoryException`**: Includes requested size, available bytes, capacity, and current offset
-- **`InvalidAddressException`**: Includes address attempted, bytes needed, allocated boundary, and capacity
-- **`InvalidPointerException`**: Includes pointer value, node size, allocated boundary, and capacity
-
-This makes debugging memory issues immediate and clear.
-
-### `checkAddr(addr, bytesNeeded)`
-
-Ensures:
-- The address is non-negative
-- The requested memory range fits entirely inside allocated memory
-
-Used for primitive reads and writes. Throws `InvalidAddressException` with full context on failure.
-
-### `checkNodePtr(ptr)` (in NodeStore)
-
-Ensures:
-- The pointer is `-1` (null), or
-- The pointer references a full node inside allocated memory
-
-Used for all node-based operations. Throws `InvalidPointerException` with full context on failure.
+```
+Memory Access Request
+        │
+        ├─→ checkAddr(addr, size)
+        │   ├─ addr >= 0?
+        │   ├─ addr + size <= offset?
+        │   └─→ Access granted
+        │
+        └─→ checkNodePtr(ptr)
+            ├─ ptr == -1? (essentially null)
+            ├─ ptr + NODE_SIZE <= offset? 
+            └─→ Valid pointer
+```
 
 ### Memory Alignment
 
@@ -184,6 +211,18 @@ The arena supports aligned allocation:
 - `align(addr, alignment)`: Calculates next aligned address
 - `allocAligned(size, alignment)`: Allocates memory at aligned boundaries
 - Tracks alignment waste for memory efficiency analysis
+
+```
+Unaligned Allocation:        Aligned Allocation (4-byte):
+┌──────────────────┐          ┌─────────────────┐
+│ [3 bytes]        │          │ [3 bytes][pad]  │
+│ offset=3         │          │ offset=3        │
+│                  │          │   ↓             │
+│ alloc(4) → 3? ❌ │          │ align(3,4)=4    │
+└──────────────────┘          │ alloc(4) → 4 ✅ │
+                              └─────────────────┘
+                              Waste: 1 byte
+```
 
 This demonstrates how real systems handle memory alignment requirements.
 
@@ -214,30 +253,28 @@ The implementation prioritizes clarity, correctness, and explicit control over p
 
 ## Current Capabilities
 
-### Memory Management
-- Manual memory allocation (`alloc`, `allocAligned`)
-- Memory alignment support with waste tracking
-- Strict bounds checking on all operations
-- Arena reset functionality
-
-### Primitive Types (All Big-Endian)
-- `byte` (1 byte)
-- `short` (2 bytes)
-- `int` (4 bytes)
-- `long` (8 bytes)
-- `char` (2 bytes, UTF-16)
-- `boolean` (1 byte)
-
-### Data Structures
-- `NodeStore`: Separated node logic with clean API
-- Struct-like node layouts (8 bytes: value + next pointer)
-- Pointer validation with null sentinel (`-1`)
-- Linked list creation and traversal
-
-### Error Handling
-- Custom exception hierarchy (`MemoryException` base)
-- Detailed error messages with diagnostic context
-- Fail-fast behavior for all invalid operations
+```
+┌─────────────────────────────────────────────────────────┐
+│ Memory Management                                       │
+│ • alloc(size) / allocAligned(size, alignment)           │
+│ • Alignment waste tracking                              │
+│ • Bounds checking on all operations                     │
+│ • reset() clears arena                                  │
+├─────────────────────────────────────────────────────────┤
+│ Primitive Types (Big-Endian)                            │
+│ • byte (1B) • short (2B) • int (4B) • long (8B)         │
+│ • char (2B, UTF-16) • boolean (1B)                      │
+├─────────────────────────────────────────────────────────┤
+│ Data Structures                                         │
+│ • NodeStore: separated node logic                       │
+│ • Node layout: [value:4B][next:4B]                      │
+│ • Linked list with pointer validation                   │
+├─────────────────────────────────────────────────────────┤
+│ Error Handling                                          │
+│ • Custom exceptions with diagnostic context             │
+│ • Fail-fast on invalid operations                       │
+└─────────────────────────────────────────────────────────┘
+```
 
  
 
